@@ -127,10 +127,12 @@ int main(int, char**)
     GLuint ProgramID;
 
     std::string triangle_fragment = R"(
-#version 330 core
+#version 120
+
+//#version 330 core
 
 // Ouput data
-out vec3 color;
+//out vec3 color;
 
 uniform float color_val;
 
@@ -138,20 +140,27 @@ void main()
 {
 
     // Output color = red
-    color = vec3(1,0,color_val);
+    //color = vec3(1,0,color_val);
+    gl_FragColor = vec4(1,0,color_val,1);
 
 }
 )";
     std::string triangle_vertex = R"(
-#version 330 core
+#version 120
+
+//#version 330 core
 
 // Input vertex data, different for all executions of this shader.
-layout(location = 0) in vec3 vertexPosition_modelspace;
+//layout(location = 0) in vec3 vertexPosition_modelspace;
+
+attribute vec3 vertexPosition_modelspace;
 
 void main(){
 
-    gl_Position.xyz = vertexPosition_modelspace;
-    gl_Position.w = 1.0;
+    //gl_Position.xyz = vertexPosition_modelspace;
+    //gl_Position.w = 1.0;
+
+    gl_Position = vec4(vertexPosition_modelspace, 1.0);
 
 }
 )";
