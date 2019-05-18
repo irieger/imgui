@@ -6,6 +6,8 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include <stdio.h>
+#include <vector>
+#include <string>
 
 // About OpenGL function loaders: modern OpenGL doesn't have a standard header file and requires individual function pointers to be loaded manually.
 // Helper libraries are often used for this purpose! Here we are supporting a few common ones: gl3w, glew, glad.
@@ -22,6 +24,9 @@
 
 // Include glfw3.h after our OpenGL definitions
 #include <GLFW/glfw3.h>
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 // [Win32] Our example includes a copy of glfw3.lib pre-compiled with VS2010 to maximize ease of testing and compatibility with old VS compilers.
 // To link with VS2010-era libraries, VS2015+ requires linking with legacy_stdio_definitions.lib, which we do using this pragma.
@@ -116,9 +121,185 @@ int main(int, char**)
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
+
+//--- Start added code to prepare framebuffer rendering
+
+    GLuint ProgramID;
+
+    std::string triangle_fragment = R"(
+#version 330 core
+
+// Ouput data
+out vec3 color;
+
+uniform float color_val;
+
+void main()
+{
+
+    // Output color = red
+    color = vec3(1,0,color_val);
+
+}
+)";
+    std::string triangle_vertex = R"(
+#version 330 core
+
+// Input vertex data, different for all executions of this shader.
+layout(location = 0) in vec3 vertexPosition_modelspace;
+
+void main(){
+
+    gl_Position.xyz = vertexPosition_modelspace;
+    gl_Position.w = 1.0;
+
+}
+)";
+    char const * VertexSourcePointer = triangle_vertex.c_str();
+    char const * FragmentSourcePointer = triangle_fragment.c_str();
+    int InfoLogLength;
+    GLint Result = GL_FALSE;
+
+    GLuint VertexShaderID = glCreateShader(GL_VERTEX_SHADER);
+    GLuint FragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
+
+    glShaderSource(VertexShaderID, 1, &VertexSourcePointer , NULL);
+    glCompileShader(VertexShaderID);
+    // Check Vertex Shader
+    glGetShaderiv(VertexShaderID, GL_COMPILE_STATUS, &Result);
+    glGetShaderiv(VertexShaderID, GL_INFO_LOG_LENGTH, &InfoLogLength);
+    if ( InfoLogLength > 0 ){
+        std::vector<char> VertexShaderErrorMessage(InfoLogLength+1);
+        glGetShaderInfoLog(VertexShaderID, InfoLogLength, NULL, &VertexShaderErrorMessage[0]);
+        printf("%s\n", &VertexShaderErrorMessage[0]);
+    }
+
+    glShaderSource(FragmentShaderID, 1, &FragmentSourcePointer , NULL);
+    glCompileShader(FragmentShaderID);
+    // Check Fragment Shader
+    glGetShaderiv(FragmentShaderID, GL_COMPILE_STATUS, &Result);
+    glGetShaderiv(FragmentShaderID, GL_INFO_LOG_LENGTH, &InfoLogLength);
+    if ( InfoLogLength > 0 ){
+        std::vector<char> FragmentShaderErrorMessage(InfoLogLength+1);
+        glGetShaderInfoLog(FragmentShaderID, InfoLogLength, NULL, &FragmentShaderErrorMessage[0]);
+        printf("%s\n", &FragmentShaderErrorMessage[0]);
+    }
+
+    // Link the program
+    printf("Linking program\n");
+    ProgramID = glCreateProgram();
+    glAttachShader(ProgramID, VertexShaderID);
+    glAttachShader(ProgramID, FragmentShaderID);
+    glLinkProgram(ProgramID);
+
+    // Check the program
+    glGetProgramiv(ProgramID, GL_LINK_STATUS, &Result);
+    glGetProgramiv(ProgramID, GL_INFO_LOG_LENGTH, &InfoLogLength);
+    if ( InfoLogLength > 0 ){
+        std::vector<char> ProgramErrorMessage(InfoLogLength+1);
+        glGetProgramInfoLog(ProgramID, InfoLogLength, NULL, &ProgramErrorMessage[0]);
+        printf("%s\n", &ProgramErrorMessage[0]);
+    }
+
+
+    glDetachShader(ProgramID, VertexShaderID);
+    glDetachShader(ProgramID, FragmentShaderID);
+
+    glDeleteShader(VertexShaderID);
+    glDeleteShader(FragmentShaderID);
+
+    GLuint color_val = glGetUniformLocation(ProgramID, "color_val");
+    uint8_t color_cnt = 0;
+
+
+    GLuint FramebufferName = 0;
+    glGenFramebuffers(1, &FramebufferName);
+    glBindFramebuffer(GL_FRAMEBUFFER, FramebufferName);
+
+    // The texture we're going to render to
+    GLuint renderedTexture;
+    glGenTextures(1, &renderedTexture);
+
+    // "Bind" the newly created texture : all future texture functions will modify this texture
+    glBindTexture(GL_TEXTURE_2D, renderedTexture);
+
+    int tex_buffer_width = 1024;
+    int tex_buffer_height = 1024;
+
+    // Give an empty image to OpenGL ( the last "0" means "empty" )
+    glTexImage2D(GL_TEXTURE_2D, 0,GL_RGB, tex_buffer_width, tex_buffer_height, 0,GL_RGB, GL_UNSIGNED_BYTE, 0);
+
+    // Poor filtering
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    // Set "renderedTexture" as our colour attachement #0
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, renderedTexture, 0);
+
+    // Set the list of draw buffers.
+    GLenum DrawBuffers[1] = {GL_COLOR_ATTACHMENT0};
+    glDrawBuffers(1, DrawBuffers); // "1" is the size of DrawBuffers
+
+    // Always check that our framebuffer is ok
+    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        return false;
+
+
+    static const GLfloat g_vertex_buffer_data[] = {
+       -1.0f, -1.0f, 0.0f,
+       1.0f, -1.0f, 0.0f,
+       0.0f,  1.0f, 0.0f,
+    };
+    GLuint vertexbuffer;
+    glGenBuffers(1, &vertexbuffer);
+    // The following commands will talk about our 'vertexbuffer' buffer
+    glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+    // Give our vertices to OpenGL.
+    glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW);
+
+//--- End added code to prepare framebuffer rendering
+
+
     // Main loop
     while (!glfwWindowShouldClose(window))
     {
+
+//--- Start added code to render to framebuffer
+
+        // Render to our framebuffer
+        glBindFramebuffer(GL_FRAMEBUFFER, FramebufferName);
+        glViewport(0,0,tex_buffer_width,tex_buffer_height); // Render on the whole framebuffer, complete from the lower left corner to the upper right
+
+        // Clear the screen
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        // Use our shader
+        glUseProgram(ProgramID);
+
+        glUniform1f(color_val, color_cnt++ / 255.0f);
+
+        glEnableVertexAttribArray(0);
+        glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+        glVertexAttribPointer(
+           0,                  // attribute 0. No particular reason for 0, but must match the layout in the shader.
+           3,                  // size
+           GL_FLOAT,           // type
+           GL_FALSE,           // normalized?
+           0,                  // stride
+           (void*)0            // array buffer offset
+        );
+        // Draw the triangle !
+        glDrawArrays(GL_TRIANGLES, 0, 3); // Starting from vertex 0; 3 vertices total -> 1 triangle
+        glDisableVertexAttribArray(0);
+
+        // Render to the screen
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+//--- End added code to render to framebuffer
+
+
         // Poll and handle events (inputs, window resize, etc.)
         // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
         // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
@@ -165,6 +346,12 @@ int main(int, char**)
             ImGui::Text("Hello from another window!");
             if (ImGui::Button("Close Me"))
                 show_another_window = false;
+            ImGui::End();
+        }
+
+        {
+            ImGui::Begin("Image widnow");
+            ImGui::Image((void*)(intptr_t)renderedTexture, ImVec2(512, 512));
             ImGui::End();
         }
 

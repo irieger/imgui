@@ -31,7 +31,7 @@ LIBS =
 
 ## Using OpenGL loader: gl3w [default]
 SOURCES += ../libs/gl3w/GL/gl3w.c
-CXXFLAGS += -I../libs/gl3w
+CXXFLAGS += -I../libs/gl3w -I../../glm
 
 ## Using OpenGL loader: glew
 ## (This assumes a system-wide installation)
