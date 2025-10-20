@@ -167,9 +167,28 @@ static void SetupVulkan(ImVector<const char*> instance_extensions)
         vkEnumerateDeviceExtensionProperties(g_PhysicalDevice, nullptr, &properties_count, nullptr);
         properties.resize(properties_count);
         vkEnumerateDeviceExtensionProperties(g_PhysicalDevice, nullptr, &properties_count, properties.Data);
+        for (const auto& prop : properties)
+        {
+            printf("Extension found: %s\n", prop.extensionName);
+        }
+
 #ifdef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
         if (IsExtensionAvailable(properties, VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME))
             device_extensions.push_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+#endif
+#ifdef VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME
+        if (IsExtensionAvailable(properties, VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME))
+        {
+            printf("Add swapchain color space\n");
+            device_extensions.push_back(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
+        }
+#endif
+#ifdef VK_EXT_4444_FORMATS_EXTENSION_NAME
+        if (IsExtensionAvailable(properties, VK_EXT_4444_FORMATS_EXTENSION_NAME))
+        {
+            printf("Add 4444 formats\n");
+            device_extensions.push_back(VK_EXT_4444_FORMATS_EXTENSION_NAME);
+        }
 #endif
 
         const float queue_priority[] = { 1.0f };
@@ -225,9 +244,26 @@ static void SetupVulkanWindow(ImGui_ImplVulkanH_Window* wd, VkSurfaceKHR surface
     }
 
     // Select Surface Format
-    const VkFormat requestSurfaceImageFormat[] = { VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8_UNORM };
-    const VkColorSpaceKHR requestSurfaceColorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
+    const VkFormat requestSurfaceImageFormat[] = {
+        VK_FORMAT_A2R10G10B10_UNORM_PACK32,
+        VK_FORMAT_A2R10G10B10_UINT_PACK32,
+        VK_FORMAT_A2B10G10R10_UNORM_PACK32,
+        VK_FORMAT_A2B10G10R10_UINT_PACK32,
+        VK_FORMAT_A2B10G10R10_UINT_PACK32,
+        VK_FORMAT_R16G16B16_UNORM,
+        VK_FORMAT_R16G16B16_UINT,
+        VK_FORMAT_R16G16B16A16_UNORM,
+        VK_FORMAT_R16G16B16A16_UINT,
+
+        // Fallback only
+        VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8_UNORM };
+    //const VkColorSpaceKHR requestSurfaceColorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
+    const VkColorSpaceKHR requestSurfaceColorSpace = VK_COLOR_SPACE_HDR10_ST2084_EXT;
     wd->SurfaceFormat = ImGui_ImplVulkanH_SelectSurfaceFormat(g_PhysicalDevice, wd->Surface, requestSurfaceImageFormat, (size_t)IM_ARRAYSIZE(requestSurfaceImageFormat), requestSurfaceColorSpace);
+    printf("Selected surface format and color space: %d, %d\n", wd->SurfaceFormat.format, wd->SurfaceFormat.colorSpace);
+
+    // Try forcing color space
+    wd->SurfaceFormat.colorSpace = requestSurfaceColorSpace;
 
     // Select Present Mode
 #ifdef APP_USE_UNLIMITED_FRAME_RATE
