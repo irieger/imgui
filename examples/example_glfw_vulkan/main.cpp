@@ -191,6 +191,12 @@ static void SetupVulkan(ImVector<const char*> instance_extensions)
         }
 #endif
 
+printf("Number of selected device extensions: %d\n", (uint32_t)device_extensions.Size);
+for (const auto& ext : device_extensions)
+{
+    printf("  Selected Ext: %s\n", ext);
+}
+
         const float queue_priority[] = { 1.0f };
         VkDeviceQueueCreateInfo queue_info[1] = {};
         queue_info[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;

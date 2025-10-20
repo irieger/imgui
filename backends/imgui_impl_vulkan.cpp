@@ -1457,7 +1457,7 @@ VkSurfaceFormatKHR ImGui_ImplVulkanH_SelectSurfaceFormat(VkPhysicalDevice physic
     {
         for (uint32_t idx = 0; idx < avail_count; ++idx)
         {
-            printf("Found surface color space: %d - %d\n", avail_format[idx].format, avail_format[idx].colorSpace);
+            printf("Found surface format - color space: %d - %d\n", avail_format[idx].format, avail_format[idx].colorSpace);
         }
         // Request several formats, the first found will be used
         for (int request_i = 0; request_i < request_formats_count; request_i++)
